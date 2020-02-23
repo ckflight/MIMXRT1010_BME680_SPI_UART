@@ -146,67 +146,6 @@ void CK_SPI_Write(LPSPI_Type* LPSPIx, uint8_t reg, uint8_t data){
 
 }
 
-status_t CK_SPI_Write2(LPSPI_Type* LPSPIx, uint8_t reg, uint8_t data){
-
-	lpspi_transfer_t masterXfer;
-
-	uint8_t masterTxData[2];
-	masterTxData[0] = reg;
-	masterTxData[1] = data;
-    // Start master transfer, transfer data to slave
-    masterXfer.txData   = masterTxData;
-    masterXfer.rxData   = NULL;
-    masterXfer.dataSize = 2;
-    masterXfer.configFlags = kLPSPI_MasterPcs0 | kLPSPI_MasterPcsContinuous | kLPSPI_SlaveByteSwap;
-
-
-    // Check that LPSPI is not busy.
-    if (LPSPI_GetStatusFlags(LPSPI1) & kLPSPI_ModuleBusyFlag)
-    {
-        return kStatus_LPSPI_Busy;
-    }
-
-
-    // The TX and RX FIFO sizes are always the same
-    uint32_t fifoSize = LPSPI_GetRxFifoSize(LPSPI1);
-    uint32_t whichPcs = (masterXfer.configFlags & LPSPI_MASTER_PCS_MASK) >> LPSPI_MASTER_PCS_SHIFT;
-
-    bool isPcsContinuous = (bool)(masterXfer.configFlags & kLPSPI_MasterPcsContinuous);
-    bool isRxMask        = false;
-
-    LPSPI_FlushFifo(LPSPI1, true, true);
-    LPSPI_ClearStatusFlags(LPSPI1, kLPSPI_AllStatusFlag);
-
-    isRxMask = true;
-
-    GPIO_PortClear(GPIO1, 1u << 19);
-
-
-    LPSPI1->TCR = (LPSPI1->TCR & ~(LPSPI_TCR_CONT_MASK | LPSPI_TCR_CONTC_MASK | LPSPI_TCR_RXMSK_MASK | LPSPI_TCR_PCS_MASK)) |
-                   LPSPI_TCR_CONT(isPcsContinuous) | LPSPI_TCR_CONTC(0) | LPSPI_TCR_RXMSK(isRxMask) | LPSPI_TCR_PCS(whichPcs);
-
-
-    // Wait until TX FIFO is not full
-    while (LPSPI_GetTxFifoCount(LPSPI1) == fifoSize);
-
-    LPSPI_WriteData(LPSPI1, reg);
-
-    // Wait until TX FIFO is not full
-    while (LPSPI_GetTxFifoCount(LPSPI1) == fifoSize);
-
-    LPSPI_WriteData(LPSPI1, data);
-
-
-    // If no RX buffer, then transfer is not complete until transfer complete flag sets
-    while (!(LPSPI_GetStatusFlags(LPSPI1) & kLPSPI_TransferCompleteFlag));
-
-
-    GPIO_PortSet(GPIO1, 1u << 19);
-
-    return kStatus_Success;
-
-
-}
 
 uint8_t CK_SPI_Read(LPSPI_Type* LPSPIx, uint8_t reg){
 
